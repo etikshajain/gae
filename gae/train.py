@@ -7,16 +7,17 @@ import os
 # Train on CPU (hide GPU) due to memory constraints
 os.environ['CUDA_VISIBLE_DEVICES'] = ""
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.compat.v1.disable_eager_execution()
 import numpy as np
 import scipy.sparse as sp
 
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import average_precision_score
 
-from gae.optimizer import OptimizerAE, OptimizerVAE
-from gae.input_data import load_data
-from gae.model import GCNModelAE, GCNModelVAE
+from gae.input_dataa import load_data
+from gae.optimizerr import OptimizerAE, OptimizerVAE
+from gae.modell import GCNModelAE, GCNModelVAE
 from gae.preprocessing import preprocess_graph, construct_feed_dict, sparse_to_tuple, mask_test_edges
 
 # Settings

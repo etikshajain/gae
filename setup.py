@@ -14,6 +14,9 @@ setup(name='gae',
                         'networkx',
                         'scikit-learn',
                         'scipy',
+                        'torch',
+                        'pandas',
+                        'dgl'
                         ],
       extras_require={
           'visualization': ['matplotlib'],
