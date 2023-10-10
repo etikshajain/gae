@@ -6,6 +6,19 @@ import scipy.sparse as sp
 import pandas as pd
 import dgl
 import torch
+import torch.nn as nn
+from sklearn.decomposition import PCA
+
+class FeatureExpander(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(FeatureExpander, self).__init__()
+        self.fc = nn.Linear(input_dim, output_dim)
+
+    def forward(self, x):
+        return self.fc(x)
+
+# Initialize the PCA model
+pca = PCA(n_components=2)  # Reduce to 2 dimensions
 
 
 def parse_index_file(filename):
@@ -16,7 +29,7 @@ def parse_index_file(filename):
 
 def col865_data():
     df1=pd.read_csv('../data/product_detail_fin.csv')
-    df2=pd.read_csv('../data/ppv_encrypted-001.csv', nrows=500)
+    df2=pd.read_csv('../data/ppv_encrypted-001.csv', nrows=5000)
     df3=df1.merge(df2,how='inner',on='product_id')
     ohe = pd.get_dummies(data=df3, columns=['cms_vertical'])
     mean_rating = df2.groupby("account_id_enc")["count"].mean().rename("mean")
@@ -34,35 +47,25 @@ def col865_data():
 
     prod_it=0
     user_it=df3['product_id'].nunique()
-    list_1 = []
-    list_2 = []
 
     for index,row in ohe.iterrows():
         prod_id=row['product_id']
         user_id=row['account_id_enc']
 
         if (prod_id in prod_dict.keys() and user_id in user_dict.keys()):
-            # s.append(user_dict[user_id])
-            # t.append(prod_dict[prod_id])
             print()
         elif (prod_id in prod_dict.keys()):
             user_features.append(np.array([mean_rating[user_id], num_rating[user_id]]))
-            # s.append(user_it)
-            # t.append(prod_dict[prod_id])
             user_dict[user_id]=user_it
             user_it+=1
         elif (user_id in user_dict.keys()):
             prod_features.append(ohe.iloc[index].drop(['product_id','account_id_enc','count']).to_numpy())
-            # s.append(user_dict[user_id])
-            # t.append(prod_it)
             prod_dict[prod_id]=prod_it
             prod_it+=1
 
         else:
             user_features.append(np.array([mean_rating[user_id], num_rating[user_id]]))
             prod_features.append(ohe.iloc[index].drop(['product_id','account_id_enc','count']).to_numpy())
-            # s.append(user_it)
-            # t.append(prod_it)
             prod_dict[prod_id]=prod_it
             prod_it+=1
             user_dict[user_id]=user_it
@@ -72,7 +75,7 @@ def col865_data():
         s.append(prod_dict[prod_id])
         t.append(user_dict[user_id])
         e_wt.append(row['count'])
-        e_wt.append(row['count'])
+        e_wt.append(1) #**************************************************
         edge_list.append([user_dict[user_id],prod_dict[prod_id]])
         # edge_list.append([prod_dict[prod_id],user_dict[user_id]])
 
@@ -84,10 +87,17 @@ def col865_data():
     G_nx = g.to_networkx()
     adj = nx.adjacency_matrix(G_nx)
 
+    # Fit the PCA model to your data and transform your features
+    # reduced_features = pca.fit_transform(np.asarray(prod_features))
+    # reduced_features = torch.tensor(reduced_features, dtype=torch.float32, requires_grad=True)
     prod_features = torch.tensor(prod_features, dtype=torch.float32, requires_grad=True)
-    user_features = torch.randn(15, 144)
-    user_features_expanded = torch.tensor(user_features, dtype=torch.float32, requires_grad=True)
-    node_features = torch.cat([user_features_expanded, prod_features], dim=0)
+    user_features = torch.tensor(user_features, dtype=torch.float32, requires_grad=True)
+    user_features = torch.randn(user_features.shape[0], prod_features.shape[1])
+    user_features = torch.tensor(user_features, dtype=torch.float32, requires_grad=True)
+    # expander = FeatureExpander(2, prod_features.shape[1])
+    # user_features_expanded = expander(user_features)
+    # user_features_expanded = torch.tensor(user_features_expanded, dtype=torch.float32, requires_grad=True)
+    node_features = torch.cat([user_features, prod_features], dim=0) # **********************************************
     features=sp.csr_matrix(node_features.detach().numpy()).tolil()
     return adj, features
 
