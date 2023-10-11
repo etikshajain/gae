@@ -9,7 +9,8 @@ class OptimizerAE(object):
         preds_sub = preds
         labels_sub = labels
 
-        self.cost = norm * tf.reduce_mean(tf.nn.weighted_cross_entropy_with_logits(logits=preds_sub, targets=labels_sub, pos_weight=pos_weight))
+        # self.cost = norm * tf.reduce_mean(tf.nn.weighted_cross_entropy_with_logits(logits=preds_sub, targets=labels_sub, pos_weight=pos_weight))
+        self.cost = norm * tf.reduce_mean(tf.losses.mean_squared_error(predictions=preds_sub, labels=labels_sub, weights=pos_weight))
         self.optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate)  # Adam Optimizer
 
         self.opt_op = self.optimizer.minimize(self.cost)
@@ -25,7 +26,8 @@ class OptimizerVAE(object):
         preds_sub = preds
         labels_sub = labels
 
-        self.cost = norm * tf.reduce_mean(tf.nn.weighted_cross_entropy_with_logits(logits=preds_sub, targets=labels_sub, pos_weight=pos_weight))
+        # self.cost = norm * tf.reduce_mean(tf.nn.weighted_cross_entropy_with_logits(logits=preds_sub, targets=labels_sub, pos_weight=pos_weight))
+        self.cost = norm * tf.reduce_mean(tf.losses.mean_squared_error(predictions=preds_sub, labels=labels_sub, weights=pos_weight))
         self.optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate)  # Adam Optimizer
 
         # Latent loss

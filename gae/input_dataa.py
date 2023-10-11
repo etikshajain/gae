@@ -27,57 +27,80 @@ def parse_index_file(filename):
         index.append(int(line.strip()))
     return index
 
+def create_node_dict(df_merged):
+    product_ids = np.unique(df_merged['product_id'])
+    user_ids = np.unique(df_merged['account_id_enc'])
+    node_dict = {}
+    for i in range(len(product_ids)):
+        node_dict[product_ids[i]] = i 
+    for i in range(len(user_ids)):
+        node_dict[user_ids[i]] = i + len(product_ids)
+    return node_dict
+
 def col865_data():
     df1=pd.read_csv('../data/product_detail_fin.csv')
-    df2=pd.read_csv('../data/ppv_encrypted-001.csv', nrows=5000)
+    df2=pd.read_csv('../data/ppv_encrypted-001.csv', nrows=10000)
     df3=df1.merge(df2,how='inner',on='product_id')
-    ohe = pd.get_dummies(data=df3, columns=['cms_vertical'])
+
+    # Normalising
+    min_val = df3['count'].min()
+    max_val = df3['count'].max()
+    df3['count'] = (df3['count'] - min_val) / (max_val - min_val)
+    min_val = df3['price'].min()
+    max_val = df3['price'].max()
+    df3['price'] = (df3['price'] - min_val) / (max_val - min_val)
+
+    # frequency encoding
+    # Calculate the frequency of each category
+    frequency_map = df3['cms_vertical'].value_counts().to_dict()
+
+    # Map the frequency values to the original column
+    df3['cms_vertical'] = df3['cms_vertical'].map(frequency_map)
+
+    # ohe = pd.get_dummies(data=df3, columns=['cms_vertical'])
+    ohe = df3
+    # User features
     mean_rating = df2.groupby("account_id_enc")["count"].mean().rename("mean")
     num_rating = df2.groupby("account_id_enc")["product_id"].count().rename("total")
 
     ## Maps for edges and id encoding
-    user_dict={}
-    prod_dict={}
-    edge_list=[]
+    node_dict=create_node_dict(df3)
     s=[]
     t=[]
-    prod_features=[]
-    user_features=[]
     e_wt=[]
+    edge_list = []
 
-    prod_it=0
-    user_it=df3['product_id'].nunique()
+    # create empty features 2d array of size (total_nodes, feature dim)
+    for index,row in ohe.iterrows():
+        prod_feat_len = len(ohe.iloc[index].drop(['product_id','account_id_enc','count']).to_numpy())
+        break
+    total_nodes = len(node_dict)
+    prod_feat_len = 64
+    node_features = np.empty(shape=(total_nodes,prod_feat_len))
 
     for index,row in ohe.iterrows():
         prod_id=row['product_id']
         user_id=row['account_id_enc']
-
-        if (prod_id in prod_dict.keys() and user_id in user_dict.keys()):
-            print()
-        elif (prod_id in prod_dict.keys()):
-            user_features.append(np.array([mean_rating[user_id], num_rating[user_id]]))
-            user_dict[user_id]=user_it
-            user_it+=1
-        elif (user_id in user_dict.keys()):
-            prod_features.append(ohe.iloc[index].drop(['product_id','account_id_enc','count']).to_numpy())
-            prod_dict[prod_id]=prod_it
-            prod_it+=1
-
-        else:
-            user_features.append(np.array([mean_rating[user_id], num_rating[user_id]]))
-            prod_features.append(ohe.iloc[index].drop(['product_id','account_id_enc','count']).to_numpy())
-            prod_dict[prod_id]=prod_it
-            prod_it+=1
-            user_dict[user_id]=user_it
-            user_it+=1
-        s.append(user_dict[user_id])
-        t.append(prod_dict[prod_id])
-        s.append(prod_dict[prod_id])
-        t.append(user_dict[user_id])
         e_wt.append(row['count'])
-        e_wt.append(1) #**************************************************
-        edge_list.append([user_dict[user_id],prod_dict[prod_id]])
-        # edge_list.append([prod_dict[prod_id],user_dict[user_id]])
+        e_wt.append(0)
+
+        user_index = node_dict[user_id]
+        prod_index = node_dict[prod_id]
+        s.append(node_dict[user_id])
+        t.append(node_dict[prod_id])
+        s.append(node_dict[prod_id])
+        t.append(node_dict[user_id])
+        edge_list.append((user_index, prod_index))
+        edge_list.append((prod_index, user_index))
+
+        # node_features[prod_index] = ohe.iloc[index].drop(['product_id','account_id_enc','count']).to_numpy()
+        u=np.array([mean_rating[user_id], num_rating[user_id]])
+        padded_u = np.pad(u, (0, 62), mode='constant')
+        p = ohe.iloc[index].drop(['product_id','account_id_enc','count']).to_numpy()
+        padded_p = np.pad(p, (0, 62), mode='constant')
+        # padded_u = u
+        node_features[user_index] = padded_u
+        node_features[prod_index] = padded_p
 
     source=np.asarray(s)
     target=np.asarray(t)
@@ -87,18 +110,30 @@ def col865_data():
     G_nx = g.to_networkx()
     adj = nx.adjacency_matrix(G_nx)
 
-    # Fit the PCA model to your data and transform your features
-    # reduced_features = pca.fit_transform(np.asarray(prod_features))
-    # reduced_features = torch.tensor(reduced_features, dtype=torch.float32, requires_grad=True)
-    prod_features = torch.tensor(prod_features, dtype=torch.float32, requires_grad=True)
-    user_features = torch.tensor(user_features, dtype=torch.float32, requires_grad=True)
-    user_features = torch.randn(user_features.shape[0], prod_features.shape[1])
-    user_features = torch.tensor(user_features, dtype=torch.float32, requires_grad=True)
-    # expander = FeatureExpander(2, prod_features.shape[1])
-    # user_features_expanded = expander(user_features)
-    # user_features_expanded = torch.tensor(user_features_expanded, dtype=torch.float32, requires_grad=True)
-    node_features = torch.cat([user_features, prod_features], dim=0) # **********************************************
-    features=sp.csr_matrix(node_features.detach().numpy()).tolil()
+    adjacency_matrix = np.zeros((total_nodes, total_nodes))
+    # Fill the adjacency matrix with weights
+    i=0
+    for edge in edge_list:
+        node1, node2 = edge
+
+        weight=e_wt[i]
+        # print(weight)
+        i+=1
+        adjacency_matrix[node1][node2] = weight
+
+    # Print the weighted adjacency matrix
+    print(adjacency_matrix)
+
+    print(df1.count())
+    print(df2.count())
+    print(df3.count())
+    print(len(s))
+    print(len(t))
+    print(len(e_wt))
+    print(len(node_features))
+    print(len(node_features[0]))
+
+    features=sp.csr_matrix(node_features).tolil()
     return adj, features
 
 
