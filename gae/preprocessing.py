@@ -1,7 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
 
-
 def sparse_to_tuple(sparse_mx):
     if not sp.isspmatrix_coo(sparse_mx):
         sparse_mx = sparse_mx.tocoo()
