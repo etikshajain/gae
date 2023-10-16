@@ -3,6 +3,8 @@ from __future__ import print_function
 
 import time
 import os
+import numpy as np
+import matplotlib.pyplot as plt
 
 # Train on CPU (hide GPU) due to memory constraints
 os.environ['CUDA_VISIBLE_DEVICES'] = ""
@@ -131,6 +133,16 @@ def get_roc_score(edges_pos, edges_neg, emb=None):
 
     return roc_score, ap_score
 
+def plot(arr, name):
+    epochs_arr = np.arange(0, 100)
+    x = np.asarray(epochs_arr)
+    ypoints = np.asarray(arr)
+    plt.plot(x, ypoints)
+    plt.xlabel("Epochs")
+    plt.ylabel(name)
+    plt.legend()
+    plt.show()
+
 
 cost_val = []
 acc_val = []
@@ -138,6 +150,10 @@ val_roc_score = []
 
 adj_label = adj_train + sp.eye(adj_train.shape[0])
 adj_label = sparse_to_tuple(adj_label)
+
+train_loss_arr=[]
+val_roc_arr=[]
+val_ap_arr=[]
 
 # Train model
 for epoch in range(FLAGS.epochs):
@@ -156,12 +172,20 @@ for epoch in range(FLAGS.epochs):
     roc_curr, ap_curr = get_roc_score(val_edges, val_edges_false)
     val_roc_score.append(roc_curr)
 
+    train_loss_arr.append(avg_cost)
+    val_roc_arr.append(roc_curr)
+    val_ap_arr.append(ap_curr)
+
+
     print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(avg_cost),
           "train_acc=", "{:.5f}".format(avg_accuracy), "val_roc=", "{:.5f}".format(val_roc_score[-1]),
           "val_ap=", "{:.5f}".format(ap_curr),
           "time=", "{:.5f}".format(time.time() - t))
 
 print("Optimization Finished!")
+plot(train_loss_arr, 'Training loss')
+plot(val_roc_arr, 'ROC')
+plot(val_ap_arr, 'AP')
 
 roc_score, ap_score = get_roc_score(test_edges, test_edges_false)
 print('Test ROC score: ' + str(roc_score))

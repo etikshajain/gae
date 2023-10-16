@@ -8,6 +8,10 @@ import dgl
 import torch
 import torch.nn as nn
 from sklearn.decomposition import PCA
+from scipy.linalg import svd
+from surprise import SVD
+from surprise import Dataset
+from surprise import Reader
 
 class FeatureExpander(nn.Module):
     def __init__(self, input_dim, output_dim):
@@ -39,7 +43,7 @@ def create_node_dict(df_merged):
 
 def col865_data():
     df1=pd.read_csv('../data/product_detail_fin.csv')
-    df2=pd.read_csv('../data/ppv_encrypted-001.csv', nrows=10000)
+    df2=pd.read_csv('../data/ppv_encrypted-001.csv', nrows=500)
     df3=df1.merge(df2,how='inner',on='product_id')
 
     # Normalising
@@ -124,14 +128,14 @@ def col865_data():
     # Print the weighted adjacency matrix
     print(adjacency_matrix)
 
-    print(df1.count())
-    print(df2.count())
-    print(df3.count())
-    print(len(s))
-    print(len(t))
-    print(len(e_wt))
-    print(len(node_features))
-    print(len(node_features[0]))
+    # print(df1.count())
+    # print(df2.count())
+    # print(df3.count())
+    # print(len(s))
+    # print(len(t))
+    # print(len(e_wt))
+    # print(len(node_features))
+    # print(len(node_features[0]))
 
     features=sp.csr_matrix(node_features).tolil()
     return adj, features
