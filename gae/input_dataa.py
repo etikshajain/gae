@@ -43,8 +43,21 @@ def create_node_dict(df_merged):
 
 def col865_data():
     df1=pd.read_csv('../data/product_detail_fin.csv')
-    df2=pd.read_csv('../data/ppv_encrypted-001.csv', nrows=500)
+    df2=pd.read_csv('../data/ppv_encrypted-001.csv', nrows=100000)
     df3=df1.merge(df2,how='inner',on='product_id')
+
+    # frequency encoding
+    # Calculate the frequency of each category
+    frequency_map = df3['cms_vertical'].value_counts().to_dict()
+
+    # Map the frequency values to the original column
+    df3['cms_vertical'] = df3['cms_vertical'].map(frequency_map)
+
+    # delete sparse data
+    # dropping rows with high cms and price
+    df3 = df3[df3['cms_vertical'] < 600]
+    df3 = df3[df3['price'] < 3000]
+    df3=df3.sample(frac=1).reset_index(drop=True)
 
     # Normalising
     min_val = df3['count'].min()
@@ -53,13 +66,6 @@ def col865_data():
     min_val = df3['price'].min()
     max_val = df3['price'].max()
     df3['price'] = (df3['price'] - min_val) / (max_val - min_val)
-
-    # frequency encoding
-    # Calculate the frequency of each category
-    frequency_map = df3['cms_vertical'].value_counts().to_dict()
-
-    # Map the frequency values to the original column
-    df3['cms_vertical'] = df3['cms_vertical'].map(frequency_map)
 
     # ohe = pd.get_dummies(data=df3, columns=['cms_vertical'])
     ohe = df3
@@ -127,6 +133,7 @@ def col865_data():
 
     # Print the weighted adjacency matrix
     print(adjacency_matrix)
+    print(node_features.shape)
 
     # print(df1.count())
     # print(df2.count())
@@ -138,7 +145,7 @@ def col865_data():
     # print(len(node_features[0]))
 
     features=sp.csr_matrix(node_features).tolil()
-    return adj, features
+    return adj, features, node_features
 
 
 def load_data(dataset):

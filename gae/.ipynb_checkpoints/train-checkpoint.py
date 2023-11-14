@@ -5,9 +5,6 @@ import time
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.manifold import TSNE
-from sklearn.cluster import KMeans
-from sklearn.cluster import DBSCAN
 
 # Train on CPU (hide GPU) due to memory constraints
 os.environ['CUDA_VISIBLE_DEVICES'] = ""
@@ -43,7 +40,7 @@ model_str = FLAGS.model
 dataset_str = FLAGS.dataset
 
 # Load data
-adj, features, node_features = load_data(dataset_str)
+adj, features = load_data(dataset_str)
 
 # Store original adjacency matrix (without diagonal entries) for later
 adj_orig = adj
@@ -137,52 +134,13 @@ def get_roc_score(edges_pos, edges_neg, emb=None):
     return roc_score, ap_score, emb
 
 def plot(arr, name):
-    epochs_arr = np.arange(0, FLAGS.epochs)
+    epochs_arr = np.arange(0, 100)
     x = np.asarray(epochs_arr)
     ypoints = np.asarray(arr)
     plt.plot(x, ypoints)
     plt.xlabel("Epochs")
     plt.ylabel(name)
     plt.legend()
-    plt.show()
-
-def tsne(feats, featuress, name):
-    tsne = TSNE(n_components=2, perplexity=30, n_iter=300)
-    embeddings_2d = tsne.fit_transform(feats)
-
-    color = featuress[:,1]
-
-    plt.scatter(embeddings_2d[:, 0], embeddings_2d[:, 1], s=70, c=color)
-    plt.title(name)
-    plt.show()
-
-def km(k,feats, name):
-    # Apply K-Means clustering
-    kmeans = KMeans(n_clusters=k)
-    clusters = kmeans.fit_predict(feats)
-
-    # Scatter plot the results
-    for cluster_id in range(k):
-        plt.scatter(feats[clusters == cluster_id, 0], feats[clusters == cluster_id, 1], label=f'Cluster {cluster_id + 1}')
-
-    # Plot the cluster centers
-    cluster_centers = kmeans.cluster_centers_
-    plt.scatter(cluster_centers[:, 0], cluster_centers[:, 1], marker='x', color='black', s=100, label='Cluster Centers')
-
-    plt.title(f'K-Means Clustering (k={k}) of {name}')
-    plt.legend()
-    plt.show()
-
-def dbs(eps, min_samples, featuress, feats):
-    dbscan = DBSCAN(eps=eps, min_samples=min_samples)
-    clusters = dbscan.fit_predict(feats)
-
-    # Create a scatter plot for the clusters
-    plt.figure(figsize=(8, 6))
-    plt.scatter(featuress[:,0], featuress[:,1], c=clusters, cmap='rainbow')
-    plt.xlabel('Price')
-    plt.ylabel('Vertical')
-    plt.title(f'DBscan Clustering Results on raw features eps={eps} min_samples={min_samples}')
     plt.show()
 
 
@@ -232,22 +190,4 @@ plot(val_ap_arr, 'AP')
 roc_score, ap_score, final_emb = get_roc_score(test_edges, test_edges_false)
 print('Test ROC score: ' + str(roc_score))
 print('Test AP score: ' + str(ap_score))
-print(final_emb.shape)
-
-# tsne(node_features, node_features, 't-SNE Visualization of raw features')
-# tsne(final_emb, node_features,'t-SNE Visualization of embeddings')
-
-# km(5,node_features, 'raw features')
-# km(5,final_emb, 'embeddings')
-
-# dbs(0.5, 5, final_emb, node_features)
-# dbs(0.5, 50, final_emb, node_features)
-# dbs(10, 5, final_emb, node_features)
-# dbs(10, 50, final_emb, node_features)
-
-dbs(0.5, 5, node_features, node_features)
-dbs(0.5, 50, node_features, node_features)
-dbs(10, 5, node_features, node_features)
-dbs(10, 50, node_features, node_features)
-
-
+print(final_emb)
